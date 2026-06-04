@@ -31,7 +31,7 @@ A data-science-focused engineering project that moves beyond standard notebooks 
 
 ---
 
-## 📊 Discovered Customer Personas
+## Discovered Customer Personas
 
 Based on statistical cluster profiling of the median usage hours and acquisition metrics, the engine segments users into four clear business profiles:
 
@@ -42,7 +42,7 @@ Based on statistical cluster profiling of the median usage hours and acquisition
 
 ---
 
-## 📦 Installation & Setup
+## Installation & Setup
 
 ### 1. Clone the Repository & Install Dependencies
 ```bash
@@ -68,7 +68,7 @@ uvicorn app:app --reload --port 8000
 
 ---
 
-## 🔌 API Endpoints & Usage Example
+## API Endpoints & Usage Example
 
 ### Health Check
 * **GET** `/`
@@ -100,10 +100,5 @@ uvicorn app:app --reload --port 8000
   "marketing_action_item": "Target with massive deep-cut sales on unplayed wishlisted titles."
 }
 ```
-
----
-
-## 👨‍💻 Author
-Developed by **Kate Mezger** – passionate about bridging the gap between machine learning models and high-performance production engineering. Feel free to connect or check out my other work!
 
 ------------------------------
