@@ -1,82 +1,121 @@
-# Steam Player Segmentation Engine: End-to-End Production ML Pipeline
+# Steam Player Segmentation Engine
 
-A data-science-focused engineering project that moves beyond standard notebooks to build a live, production-ready inference system. This project processes highly skewed, sparse user interaction data from 200,000 Steam logs, engineers behavioral metrics, scales them via mathematical transformations, reduces dimensionality, and deploys the resulting cluster logic behind an asynchronous API microservice.
-
----
-
-## Core Engineering Highlights
-* **Production-Grade Architecture:** Wrapped all data wrangling, preprocessing, and scaling into an object-oriented Python pipeline class (`pipeline.py`) to eliminate data leakage between training and inference phases.
-* **Mathematical Data Stabilization:** Handled heavy gaming-hour power-law skews using a `Yeo-Johnson PowerTransformer` instead of simple standard scaling, maximizing cluster density and algorithm stability.
-* **Dimensionality Reduction:** Managed high-dimensional feature sparsity (tracking individual top-tier video game titles) by leveraging **PCA** to capture 85% of variance across dense components.
-* **Low-Latency Deployment:** Serialized the optimized K-Means artifacts and embedded them inside a **FastAPI microservice** utilizing **Pydantic** for rigid input data validation, delivering sub-15ms cluster predictions.
-* **Business Intelligence Mapping:** Translated raw mathematical cluster spaces into 4 distinct, actionable commercial personas (*The Whale, The Hoarder, The Specialist, The Casual Explorer*) paired with automated targeted marketing actions.
+An end-to-end machine learning pipeline that processes raw Steam interaction logs, engineers behavioral features, and deploys a live clustering model behind a FastAPI microservice. The system automatically segments users into commercial personas and returns real-time predictions via a REST API.
 
 ---
 
-## System Architecture Diagram
+## The Problem
 
-┌──────────────────────────────────────────────────────────────┐
-│ PRODUCTION ARCHITECTURE │
-└──────────────────────────────────────────────────────────────┘
-┌───────────────┐ ┌─────────────────┐ ┌───────────────┐
-│ Raw Logs │ ───> │ Preprocess │ ───> │ PCA + │
-│ (CSV Data) │ │ & PowerTransform│ │ K-Means │
-└───────────────┘ └─────────────────┘ └───────────────┘
-│
-▼
-┌───────────────┐ ┌─────────────────┐ ┌───────────────┐
-│ FastAPI Endpt│ <─── │ Inference │ <─── │ Serialized │
-│ (/predict) │ │ Engine (json) │ │ Artifacts │
-└───────────────┘ └─────────────────┘ └───────────────┘
+Steam has millions of users who all behave differently. Some spend thousands of hours in one game. Some buy 50 titles and barely touch any of them. Some are casual browsers with minimal investment. A single marketing strategy across all of them is wasted spend.
+
+This project lets the data find the natural groupings. No manual labeling — the algorithm discovers the structure on its own, and the personas emerge from the math.
 
 ---
 
-## Discovered Customer Personas
+## System Architecture
 
-Based on statistical cluster profiling of the median usage hours and acquisition metrics, the engine segments users into four clear business profiles:
-
-* **The Whales (Cluster 0):** Top 5% in both total playtime and games purchased. Highly active across multiple competitive multiplayer games. *Strategy: Target with high-ticket battle passes and expansion packs.*
-* **The Digital Hoarders (Cluster 1):** High game purchase count, but an extremely low completion/play ratio. Many games show 0 hours of playtime. *Strategy: Trigger notifications during major platform seasonal sales.*
-* **The Hyper-Focused Specialists (Cluster 2):** Low purchase count (under 5 games total), but hundreds of hours logged into a single title. *Strategy: Serve customized microtransactions or DLC specifically for their anchored game.*
-* **The Casual Explorers (Cluster 3):** Low playtime and minimal financial investment. Playtime is scattered thinly across indie titles. *Strategy: Target with free-to-play conversions or high-discount introductory bundles.*
+```
+Raw Logs (CSV)
+      |
+      v
+Feature Engineering          -- 26 behavioral metrics per user
+      |
+      v
+Yeo-Johnson PowerTransform   -- stabilizes heavy power-law skew in gaming hours
+      |
+      v
+PCA                          -- compresses 26 features to 17 components (87.3% variance)
+      |
+      v
+K-Means (k=4)                -- finds natural user clusters
+      |
+      v
+Persona Assignment           -- maps raw cluster IDs to named business personas
+      |
+      v
+Serialized Artifact          -- steam_pipeline.pkl
+      |
+      v
+FastAPI /predict             -- sub-15ms inference, Pydantic input validation
+```
 
 ---
 
-## Installation & Setup
+## Engineering Decisions
 
-### 1. Clone the Repository & Install Dependencies
+**Yeo-Johnson over standard scaling** — gaming hour data follows a power-law distribution. A handful of users have 5,000+ hours while the median is under 10. Standard scaling leaves that skew intact and K-Means clusters around outliers instead of behavioral patterns. Yeo-Johnson mathematically corrects for this.
+
+**OOP pipeline class** — all feature engineering, scaling, and transformation logic lives inside `SteamSegmentationPipeline`. The same object that fits on training data is serialized and loaded by the API, eliminating any risk of data leakage or preprocessing mismatches between training and inference.
+
+**Persona auto-mapping** — K-Means returns arbitrary cluster IDs (0, 1, 2, 3) that can shuffle between runs. After fitting, the pipeline profiles each cluster's median stats and assigns personas using business rules (highest hours × purchases = Whale, etc.), making labels stable and interpretable.
+
+---
+
+## Discovered Personas
+
+Derived from statistical profiling of 11,350 unique users across 200,000 interaction logs.
+
+**The Whale** — top 8% by both total playtime and games purchased. Highly active across multiple titles including CS:GO, Arma 3, Skyrim, and GTA V. Median 998 hours, 44 games purchased.
+Strategy: high-ticket battle passes and expansion packs.
+
+**The Digital Hoarder** — high purchase count, very low play-to-purchase ratio. Buys frequently during sales; many titles show 0 hours. Median 141 hours across 5 games purchased. Concentrated in long-tail simulation titles.
+Strategy: seasonal sale notifications targeting unplayed backlog.
+
+**The Hyper-Focused Specialist** — fewer than 5 games purchased but median 1,203 hours logged. The dominant game for this cluster is Football Manager across multiple annual editions — 76% of all Specialist hours come from a single franchise. Non-FM players in this cluster gravitate toward Total War, Civilization, and Crusader Kings II. These are systems-mastery players, not variety seekers.
+Strategy: franchise DLC and annual edition upgrades.
+
+**The Casual Explorer** — low playtime, low spend, scattered across indie titles. Median 2.4 total hours. Represents 51% of the user base.
+Strategy: free-to-play conversions and introductory discount bundles.
+
+---
+
+## Project Structure
+
+```
+pipeline.py          core ML class — feature engineering, transform, PCA, KMeans, persona mapping
+train.py             CLI training script — fits the pipeline and writes steam_pipeline.pkl
+app.py               FastAPI microservice — loads the artifact and serves /predict
+index.html           static persona card display
+requirements.txt     dependencies
+```
+
+---
+
+## Setup
+
+**1. Install dependencies**
 ```bash
-git clone https://github.com
-cd steam-player-segmentation
 pip install -r requirements.txt
 ```
 
-*Ensure your `requirements.txt` contains at least: `numpy`, `pandas`, `scikit-learn`, `joblib`, `fastapi`, `pydantic`, `uvicorn`.*
+**2. Download the dataset**
 
-### 2. Prepare the Data & Train the Pipeline
-Download the dataset from Kaggle or your source, place it in the root directory as `steam-200k.csv`, and run your training script to generate the serialized pipeline object:
+Get `steam-200k.csv` from [Kaggle — Steam Video Games by Tamber](https://www.kaggle.com/datasets/tamber/steam-video-games) and place it in the project root (or `archive/` subfolder).
+
+**3. Train the pipeline**
 ```bash
-python -c "from pipeline import SteamSegmentationPipeline; import pandas as pd; df=pd.read_csv('steam-200k.csv', header=None); pipe=SteamSegmentationPipeline().fit(df); pipe.save_pipeline()"
+python train.py --data archive/steam-200k.csv
 ```
-This generates the native production artifact file: `steam_pipeline.pkl`.
 
-### 3. Launch the Microservice
-Start the live inference engine locally using `uvicorn`:
+This produces `steam_pipeline.pkl`.
+
+**4. Start the API**
 ```bash
 uvicorn app:app --reload --port 8000
 ```
 
 ---
 
-## API Endpoints & Usage Example
+## API Reference
 
-### Health Check
-* **GET** `/`
-* **Response:** `{"status": "healthy", "model_loaded": true}`
+**GET /**
+```json
+{ "status": "healthy", "model_loaded": true }
+```
 
-### Real-Time Cluster Inference
-* **POST** `/predict`
-* **Payload (JSON):**
+**POST /predict**
+
+Request:
 ```json
 {
   "total_play_hours": 450.5,
@@ -92,13 +131,13 @@ uvicorn app:app --reload --port 8000
 }
 ```
 
-* **Response (JSON):**
+Response:
 ```json
 {
   "assigned_cluster": 1,
   "assigned_persona": "The Digital Hoarder",
-  "marketing_action_item": "Target with massive deep-cut sales on unplayed wishlisted titles."
+  "marketing_action_item": "Trigger notifications during major platform seasonal sales."
 }
 ```
 
-------------------------------
+Interactive docs available at `http://127.0.0.1:8000/docs` when the server is running.
